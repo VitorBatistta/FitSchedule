@@ -14,7 +14,80 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      agendamentos: {
+        Row: {
+          aluno_id: string
+          created_at: string
+          data_hora: string
+          id: string
+          status: string
+        }
+        Insert: {
+          aluno_id: string
+          created_at?: string
+          data_hora: string
+          id?: string
+          status?: string
+        }
+        Update: {
+          aluno_id?: string
+          created_at?: string
+          data_hora?: string
+          id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agendamentos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alunos: {
+        Row: {
+          created_at: string
+          data_nascimento: string | null
+          id: string
+          nome: string
+          whatsapp: string
+        }
+        Insert: {
+          created_at?: string
+          data_nascimento?: string | null
+          id?: string
+          nome: string
+          whatsapp: string
+        }
+        Update: {
+          created_at?: string
+          data_nascimento?: string | null
+          id?: string
+          nome?: string
+          whatsapp?: string
+        }
+        Relationships: []
+      }
+      app_config: {
+        Row: {
+          id: number
+          updated_at: string
+          webhook_url: string | null
+        }
+        Insert: {
+          id?: number
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Update: {
+          id?: number
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
