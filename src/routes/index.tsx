@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarPlus, Users, Clock, Phone, TrendingUp } from "lucide-react";
 import { format, isToday, isTomorrow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { api } from "@/lib/api";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -22,19 +22,7 @@ export const Route = createFileRoute("/")({
 function Dashboard() {
   const { data: stats } = useQuery({
     queryKey: ["stats"],
-    queryFn: async () => {
-      const [{ count: alunos }, { count: agendamentos }, upcoming] = await Promise.all([
-        supabase.from("alunos").select("*", { count: "exact", head: true }),
-        supabase.from("agendamentos").select("*", { count: "exact", head: true }).gte("data_hora", new Date().toISOString()),
-        supabase
-          .from("agendamentos")
-          .select("id, data_hora, status, alunos(nome, whatsapp)")
-          .gte("data_hora", new Date().toISOString())
-          .order("data_hora", { ascending: true })
-          .limit(8),
-      ]);
-      return { alunos: alunos ?? 0, agendamentos: agendamentos ?? 0, upcoming: upcoming.data ?? [] };
-    },
+    queryFn: api.dashboard,
   });
 
   return (
@@ -58,10 +46,10 @@ function Dashboard() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-3 mb-8">
-        <StatCard icon={<Users className="h-5 w-5" />} label="Alunos cadastrados" value={stats?.alunos ?? "—"} />
-        <StatCard icon={<CalendarPlus className="h-5 w-5" />} label="Aulas futuras" value={stats?.agendamentos ?? "—"} />
+        <StatCard icon={<Users className="h-5 w-5" />} label="Alunos cadastrados" value={stats?.students ?? "—"} />
+        <StatCard icon={<CalendarPlus className="h-5 w-5" />} label="Aulas futuras" value={stats?.futureAppointments ?? "—"} />
         <StatCard icon={<TrendingUp className="h-5 w-5" />} label="Próximas 24h"
-          value={(stats?.upcoming ?? []).filter((a: any) => isToday(new Date(a.data_hora)) || isTomorrow(new Date(a.data_hora))).length} />
+          value={(stats?.upcoming ?? []).filter((a) => isToday(new Date(a.scheduledAt)) || isTomorrow(new Date(a.scheduledAt))).length} />
       </section>
 
       <section>
@@ -82,8 +70,8 @@ function Dashboard() {
           </Card>
         ) : (
           <div className="grid gap-3">
-            {stats.upcoming.map((a: any) => {
-              const date = new Date(a.data_hora);
+            {stats.upcoming.map((a) => {
+              const date = new Date(a.scheduledAt);
               const label = isToday(date) ? "Hoje" : isTomorrow(date) ? "Amanhã" : format(date, "EEE, dd MMM", { locale: ptBR });
               return (
                 <Card key={a.id} className="overflow-hidden hover:border-primary/50 transition-colors">
@@ -95,10 +83,10 @@ function Dashboard() {
                       </div>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold truncate">{a.alunos?.nome ?? "—"}</p>
+                      <p className="font-semibold truncate">{a.student?.name ?? "—"}</p>
                       <p className="text-sm text-muted-foreground flex items-center gap-1">
                         <Phone className="h-3 w-3" />
-                        {a.alunos?.whatsapp ?? ""}
+                        {a.student?.whatsapp ?? ""}
                       </p>
                     </div>
                     <div className="hidden sm:block text-right text-sm text-muted-foreground">

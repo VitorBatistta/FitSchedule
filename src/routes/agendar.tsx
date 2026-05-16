@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,7 @@ import { CalendarPlus, Trash2, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { format, isToday, isTomorrow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { sendToWebhook } from "@/lib/webhook";
+import { api, errorMessage } from "@/lib/api";
 
 export const Route = createFileRoute("/agendar")({
   head: () => ({ meta: [{ title: "Agendar — FitSchedule" }] }),
@@ -30,19 +29,12 @@ function AgendarPage() {
 
   const { data: alunos = [] } = useQuery({
     queryKey: ["alunos"],
-    queryFn: async () => (await supabase.from("alunos").select("id, nome, whatsapp").order("nome")).data ?? [],
+    queryFn: api.listStudents,
   });
 
   const { data: agendamentos = [] } = useQuery({
     queryKey: ["agendamentos-future"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("agendamentos")
-        .select("id, data_hora, status, alunos(nome, whatsapp)")
-        .gte("data_hora", new Date().toISOString())
-        .order("data_hora");
-      return data ?? [];
-    },
+    queryFn: api.listFutureAppointments,
   });
 
   async function submit(e: React.FormEvent) {
@@ -50,66 +42,37 @@ function AgendarPage() {
     if (!alunoId || !data || !hora) return toast.error("Preencha aluno, data e horário");
     const dt = new Date(`${data}T${hora}:00`);
     if (isNaN(dt.getTime())) return toast.error("Data/horário inválido");
-    if (dt < new Date()) return toast.error("Não é possível agendar no passado");
 
     setSaving(true);
     try {
-      // conflict check
-      const iso = dt.toISOString();
-      const { data: conflict } = await supabase
-        .from("agendamentos")
-        .select("id, alunos(nome)")
-        .eq("data_hora", iso)
-        .maybeSingle();
-
-      if (conflict) {
-        toast.error("Horário ocupado", {
-          description: `Já existe agendamento com ${(conflict as any).alunos?.nome ?? "outro aluno"} neste horário.`,
-        });
-        return;
-      }
-
-      const aluno = alunos.find((a: any) => a.id === alunoId);
-      const { data: inserted, error } = await supabase
-        .from("agendamentos")
-        .insert({ aluno_id: alunoId, data_hora: iso })
-        .select("id")
-        .single();
-
-      if (error) {
-        if ((error as any).code === "23505") {
-          toast.error("Horário ocupado", { description: "Já existe outro agendamento neste exato horário." });
-        } else toast.error(error.message);
-        return;
-      }
-
-      const webhook = await sendToWebhook({
-        event: "agendamento.criado",
-        agendamento_id: inserted!.id,
-        nome: aluno?.nome,
-        whatsapp: aluno?.whatsapp,
-        data_hora_agendamento: iso,
-        data_hora_local: format(dt, "dd/MM/yyyy HH:mm", { locale: ptBR }),
+      await api.createAppointment({
+        studentId: alunoId,
+        scheduledAt: dt.toISOString(),
       });
 
       toast.success("Agendamento confirmado!", {
-        description: webhook.sent ? "Webhook enviado ao n8n." : "Configure o webhook em Configurações para automações.",
+        description: "O backend validou o horário e processou a automação configurada.",
       });
 
       setAlunoId(""); setData(""); setHora("");
       qc.invalidateQueries({ queryKey: ["agendamentos-future"] });
       qc.invalidateQueries({ queryKey: ["stats"] });
+    } catch (err: unknown) {
+      toast.error("Não foi possível agendar", { description: errorMessage(err, "Erro ao criar agendamento") });
     } finally {
       setSaving(false);
     }
   }
 
   async function remove(id: string) {
-    const { error } = await supabase.from("agendamentos").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("Agendamento removido");
-    qc.invalidateQueries({ queryKey: ["agendamentos-future"] });
-    qc.invalidateQueries({ queryKey: ["stats"] });
+    try {
+      await api.deleteAppointment(id);
+      toast.success("Agendamento removido");
+      qc.invalidateQueries({ queryKey: ["agendamentos-future"] });
+      qc.invalidateQueries({ queryKey: ["stats"] });
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, "Erro ao remover agendamento"));
+    }
   }
 
   return (
@@ -137,8 +100,8 @@ function AgendarPage() {
                   <Select value={alunoId} onValueChange={setAlunoId}>
                     <SelectTrigger><SelectValue placeholder="Selecione um aluno" /></SelectTrigger>
                     <SelectContent>
-                      {alunos.map((a: any) => (
-                        <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
+                      {alunos.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -172,8 +135,8 @@ function AgendarPage() {
             </CardContent></Card>
           ) : (
             <div className="grid gap-3">
-              {agendamentos.map((a: any) => {
-                const d = new Date(a.data_hora);
+              {agendamentos.map((a) => {
+                const d = new Date(a.scheduledAt);
                 const tag = isToday(d) ? "Hoje" : isTomorrow(d) ? "Amanhã" : format(d, "EEE dd/MM", { locale: ptBR });
                 return (
                   <Card key={a.id}>
@@ -185,7 +148,7 @@ function AgendarPage() {
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate">{a.alunos?.nome}</p>
+                        <p className="font-semibold truncate">{a.student?.name}</p>
                         <p className="text-xs text-muted-foreground">{format(d, "dd/MM/yyyy 'às' HH:mm")}</p>
                       </div>
                       <Button size="icon" variant="ghost" onClick={() => remove(a.id)}
