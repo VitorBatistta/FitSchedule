@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Webhook, Save, Send } from "lucide-react";
 import { toast } from "sonner";
-import { getWebhookUrl, setWebhookUrl, sendToWebhook } from "@/lib/webhook";
+import { api, errorMessage } from "@/lib/api";
 
 export const Route = createFileRoute("/configuracoes")({
   head: () => ({ meta: [{ title: "Configurações — FitSchedule" }] }),
@@ -20,26 +20,32 @@ function Config() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    getWebhookUrl().then((u) => { setUrl(u); setLoading(false); });
+    api.getWebhookUrl()
+      .then((config) => setUrl(config.webhookUrl ?? ""))
+      .finally(() => setLoading(false));
   }, []);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
-      await setWebhookUrl(url.trim());
+      await api.setWebhookUrl(url.trim());
       toast.success("Webhook salvo");
-    } catch (err: any) {
-      toast.error(err.message ?? "Erro ao salvar");
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, "Erro ao salvar"));
     } finally { setSaving(false); }
   }
 
   async function test() {
     if (!url.trim()) return toast.error("Informe a URL primeiro");
-    await setWebhookUrl(url.trim());
-    const r = await sendToWebhook({ event: "test", message: "Teste do FitSchedule", at: new Date().toISOString() });
-    if (r.sent) toast.success("Payload de teste enviado");
-    else toast.error("Falha ao enviar", { description: r.reason });
+    try {
+      await api.setWebhookUrl(url.trim());
+      const r = await api.testWebhook();
+      if (r.sent) toast.success("Payload de teste enviado");
+      else toast.error("Falha ao enviar", { description: r.reason });
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, "Falha ao enviar teste"));
+    }
   }
 
   return (
