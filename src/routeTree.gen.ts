@@ -9,11 +9,23 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PersonaisRouteImport } from './routes/personais'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as AlunosRouteImport } from './routes/alunos'
 import { Route as AgendarRouteImport } from './routes/agendar'
 import { Route as IndexRouteImport } from './routes/index'
 
+const PersonaisRoute = PersonaisRouteImport.update({
+  id: '/personais',
+  path: '/personais',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
   id: '/configuracoes',
   path: '/configuracoes',
@@ -40,12 +52,16 @@ export interface FileRoutesByFullPath {
   '/agendar': typeof AgendarRoute
   '/alunos': typeof AlunosRoute
   '/configuracoes': typeof ConfiguracoesRoute
+  '/login': typeof LoginRoute
+  '/personais': typeof PersonaisRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agendar': typeof AgendarRoute
   '/alunos': typeof AlunosRoute
   '/configuracoes': typeof ConfiguracoesRoute
+  '/login': typeof LoginRoute
+  '/personais': typeof PersonaisRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +69,28 @@ export interface FileRoutesById {
   '/agendar': typeof AgendarRoute
   '/alunos': typeof AlunosRoute
   '/configuracoes': typeof ConfiguracoesRoute
+  '/login': typeof LoginRoute
+  '/personais': typeof PersonaisRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/agendar' | '/alunos' | '/configuracoes'
+  fullPaths:
+    | '/'
+    | '/agendar'
+    | '/alunos'
+    | '/configuracoes'
+    | '/login'
+    | '/personais'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/agendar' | '/alunos' | '/configuracoes'
-  id: '__root__' | '/' | '/agendar' | '/alunos' | '/configuracoes'
+  to: '/' | '/agendar' | '/alunos' | '/configuracoes' | '/login' | '/personais'
+  id:
+    | '__root__'
+    | '/'
+    | '/agendar'
+    | '/alunos'
+    | '/configuracoes'
+    | '/login'
+    | '/personais'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,10 +98,26 @@ export interface RootRouteChildren {
   AgendarRoute: typeof AgendarRoute
   AlunosRoute: typeof AlunosRoute
   ConfiguracoesRoute: typeof ConfiguracoesRoute
+  LoginRoute: typeof LoginRoute
+  PersonaisRoute: typeof PersonaisRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/personais': {
+      id: '/personais'
+      path: '/personais'
+      fullPath: '/personais'
+      preLoaderRoute: typeof PersonaisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/configuracoes': {
       id: '/configuracoes'
       path: '/configuracoes'
@@ -107,6 +154,8 @@ const rootRouteChildren: RootRouteChildren = {
   AgendarRoute: AgendarRoute,
   AlunosRoute: AlunosRoute,
   ConfiguracoesRoute: ConfiguracoesRoute,
+  LoginRoute: LoginRoute,
+  PersonaisRoute: PersonaisRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
