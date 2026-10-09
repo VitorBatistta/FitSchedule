@@ -12,8 +12,20 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
 
   Optional<Appointment> findByScheduledAt(Instant scheduledAt);
 
+  @EntityGraph(attributePaths = "student")
+  Optional<Appointment> findFirstByScheduledAtGreaterThanAndScheduledAtLessThanOrderByScheduledAtAsc(
+    Instant start,
+    Instant end
+  );
+
   long countByScheduledAtGreaterThanEqual(Instant scheduledAt);
 
   @EntityGraph(attributePaths = "student")
   List<Appointment> findAllByScheduledAtGreaterThanEqualOrderByScheduledAtAsc(Instant scheduledAt);
+
+  @EntityGraph(attributePaths = "student")
+  List<Appointment> findAllByScheduledAtGreaterThanEqualAndScheduledAtLessThanOrderByScheduledAtAsc(
+    Instant start,
+    Instant end
+  );
 }

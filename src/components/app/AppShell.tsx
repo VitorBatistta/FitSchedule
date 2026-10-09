@@ -1,9 +1,12 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Dumbbell, Users, CalendarPlus, Settings, LayoutDashboard } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Dumbbell, Users, CalendarPlus, Settings, LayoutDashboard, LogOut, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { clearPersonalSession, firstAllowedPath, getPersonalSession } from "@/lib/auth";
 
 const nav = [
   { to: "/", label: "Início", icon: LayoutDashboard },
+  { to: "/personais", label: "Personal", icon: UserCog },
   { to: "/alunos", label: "Alunos", icon: Users },
   { to: "/agendar", label: "Agendar", icon: CalendarPlus },
   { to: "/configuracoes", label: "Config", icon: Settings },
@@ -11,6 +14,39 @@ const nav = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
+  const [session, setSession] = useState(() => getPersonalSession());
+
+  useEffect(() => {
+    const current = getPersonalSession();
+    setSession(current);
+
+    if (!current && pathname !== "/login") {
+      window.location.href = "/login";
+      return;
+    }
+
+    if (current?.admin) {
+      return;
+    }
+
+    if (current && !["/alunos", "/agendar"].includes(pathname)) {
+      window.location.href = firstAllowedPath(current);
+    }
+  }, [pathname]);
+
+  const visibleNav = useMemo(() => {
+    if (!session) return [];
+    if (session.admin) return nav;
+    return [
+      ...(session.canManageStudents ? [{ to: "/alunos", label: "Alunos", icon: Users }] : []),
+      ...(session.canManageAppointments ? [{ to: "/agendar", label: "Agendar", icon: CalendarPlus }] : []),
+    ];
+  }, [session]);
+
+  function logout() {
+    clearPersonalSession();
+    window.location.href = "/login";
+  }
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundImage: "var(--gradient-hero)" }}>
@@ -26,7 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </Link>
           <nav className="hidden md:flex items-center gap-1">
-            {nav.map((n) => {
+            {visibleNav.map((n) => {
               const active = n.to === "/" ? pathname === "/" : pathname.startsWith(n.to);
               return (
                 <Link
@@ -41,6 +77,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
+            {session && (
+              <button
+                type="button"
+                onClick={logout}
+                className="px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              >
+                Sair
+              </button>
+            )}
           </nav>
         </div>
       </header>
@@ -51,8 +96,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Bottom nav (mobile) */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-border/60 bg-background/95 backdrop-blur">
-        <div className="mx-auto max-w-md grid grid-cols-4">
-          {nav.map((n) => {
+        <div className="mx-auto max-w-md grid grid-cols-5">
+          {visibleNav.map((n) => {
             const Icon = n.icon;
             const active = n.to === "/" ? pathname === "/" : pathname.startsWith(n.to);
             return (
@@ -69,6 +114,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+          {session && (
+            <button type="button" onClick={logout} className="flex flex-col items-center gap-1 py-3 text-xs font-medium text-muted-foreground">
+              <LogOut className="h-5 w-5" />
+              Sair
+            </button>
+          )}
         </div>
       </nav>
     </div>

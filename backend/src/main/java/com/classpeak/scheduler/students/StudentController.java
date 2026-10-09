@@ -1,5 +1,7 @@
 package com.classpeak.scheduler.students;
 
+import com.classpeak.scheduler.personals.PersonalAuthService;
+import com.classpeak.scheduler.personals.PersonalAuthService.Permission;
 import com.classpeak.scheduler.students.StudentDtos.StudentRequest;
 import com.classpeak.scheduler.students.StudentDtos.StudentResponse;
 import jakarta.validation.Valid;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -20,30 +23,36 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/alunos")
 public class StudentController {
   private final StudentService service;
+  private final PersonalAuthService authService;
 
-  public StudentController(StudentService service) {
+  public StudentController(StudentService service, PersonalAuthService authService) {
     this.service = service;
+    this.authService = authService;
   }
 
   @GetMapping
-  List<StudentResponse> list() {
+  List<StudentResponse> list(@RequestHeader("X-Personal-Id") UUID personalId) {
+    authService.requirePermission(personalId, Permission.STUDENTS);
     return service.list();
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  StudentResponse create(@Valid @RequestBody StudentRequest request) {
+  StudentResponse create(@RequestHeader("X-Personal-Id") UUID personalId, @Valid @RequestBody StudentRequest request) {
+    authService.requirePermission(personalId, Permission.STUDENTS);
     return service.create(request);
   }
 
   @PutMapping("/{id}")
-  StudentResponse update(@PathVariable UUID id, @Valid @RequestBody StudentRequest request) {
+  StudentResponse update(@RequestHeader("X-Personal-Id") UUID personalId, @PathVariable UUID id, @Valid @RequestBody StudentRequest request) {
+    authService.requirePermission(personalId, Permission.STUDENTS);
     return service.update(id, request);
   }
 
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  void delete(@PathVariable UUID id) {
+  void delete(@RequestHeader("X-Personal-Id") UUID personalId, @PathVariable UUID id) {
+    authService.requirePermission(personalId, Permission.STUDENTS);
     service.delete(id);
   }
 }

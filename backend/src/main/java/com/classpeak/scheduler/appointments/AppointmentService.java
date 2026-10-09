@@ -7,6 +7,7 @@ import com.classpeak.scheduler.settings.WebhookService;
 import com.classpeak.scheduler.students.StudentService;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AppointmentService {
+  private static final long CLASS_DURATION_MINUTES = 60;
   private static final ZoneId BUSINESS_ZONE = ZoneId.of("America/Sao_Paulo");
   private static final DateTimeFormatter LOCAL_FORMATTER =
     DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", new Locale("pt", "BR")).withZone(BUSINESS_ZONE);
@@ -45,6 +47,15 @@ public class AppointmentService {
   }
 
   @Transactional(readOnly = true)
+  public List<AppointmentResponse> listByYear(int year) {
+    var start = ZonedDateTime.of(year, 1, 1, 0, 0, 0, 0, BUSINESS_ZONE).toInstant();
+    var end = ZonedDateTime.of(year + 1, 1, 1, 0, 0, 0, 0, BUSINESS_ZONE).toInstant();
+    return repository.findAllByScheduledAtGreaterThanEqualAndScheduledAtLessThanOrderByScheduledAtAsc(start, end).stream()
+      .map(AppointmentResponse::from)
+      .toList();
+  }
+
+  @Transactional(readOnly = true)
   public long countFuture() {
     return repository.countByScheduledAtGreaterThanEqual(Instant.now());
   }
@@ -55,7 +66,10 @@ public class AppointmentService {
       throw new BusinessException(HttpStatus.BAD_REQUEST, "Não é possível agendar no passado");
     }
 
-    repository.findByScheduledAt(request.scheduledAt()).ifPresent(existing -> {
+    var conflictWindowStart = request.scheduledAt().minusSeconds((CLASS_DURATION_MINUTES * 60) - 1);
+    var conflictWindowEnd = request.scheduledAt().plusSeconds(CLASS_DURATION_MINUTES * 60);
+
+    repository.findFirstByScheduledAtGreaterThanAndScheduledAtLessThanOrderByScheduledAtAsc(conflictWindowStart, conflictWindowEnd).ifPresent(existing -> {
       throw new BusinessException(
         HttpStatus.CONFLICT,
         "Já existe agendamento com " + existing.getStudent().getName() + " neste horário"
