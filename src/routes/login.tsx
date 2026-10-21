@@ -9,23 +9,42 @@ import { api, errorMessage } from "@/lib/api";
 import { firstAllowedPath, setPersonalSession } from "@/lib/auth";
 import { toast } from "sonner";
 
+import { cn } from "@/lib/utils";
+
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Login - FitSchedule" }] }),
   component: LoginPage,
 });
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function LoginPage() {
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
-  async function handleLogin(form: FormData) {
+  async function handleLogin(formElement: HTMLFormElement) {
+    const form = new FormData(formElement);
     const email = String(form.get("email") || "").trim();
     const password = String(form.get("password") || "");
 
-    if (!email || !password) {
-      toast.error("Informe e-mail e senha");
+    const newErrors: { email?: string; password?: string } = {};
+
+    if (!email) {
+      newErrors.email = "E-mail obrigatório.";
+    } else if (!EMAIL_REGEX.test(email)) {
+      newErrors.email = "Insira um e-mail válido.";
+    }
+
+    if (!password) {
+      newErrors.password = "Senha obrigatória.";
+    }
+
+    if (newErrors.email || newErrors.password) {
+      setErrors(newErrors);
       return;
     }
 
+    setErrors({});
     setLoading(true);
     try {
       const session = await api.login({ email, password });
@@ -54,16 +73,56 @@ function LoginPage() {
         </CardHeader>
         <CardContent>
           <form
-            onSubmit={(e) => { e.preventDefault(); handleLogin(new FormData(e.currentTarget)); }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleLogin(e.currentTarget);
+            }}
+            noValidate
             className="space-y-4"
           >
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="email">E-mail</Label>
-              <Input id="email" name="email" type="email" autoComplete="email" required />
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                onChange={() => {
+                  if (errors.email) {
+                    setErrors((prev) => ({ ...prev, email: undefined }));
+                  }
+                }}
+                onBlur={(e) => {
+                  const val = e.target.value.trim();
+                  if (val && !EMAIL_REGEX.test(val)) {
+                    setErrors((prev) => ({ ...prev, email: "Insira um e-mail válido." }));
+                  }
+                }}
+                className={cn(errors.email && "border-destructive focus-visible:ring-destructive")}
+              />
+              {errors.email && (
+                <p className="text-sm font-medium text-destructive">{errors.email}</p>
+              )}
             </div>
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="password">Senha</Label>
-              <Input id="password" name="password" type="password" autoComplete="current-password" required />
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                onChange={() => {
+                  if (errors.password) {
+                    setErrors((prev) => ({ ...prev, password: undefined }));
+                  }
+                }}
+                className={cn(errors.password && "border-destructive focus-visible:ring-destructive")}
+              />
+              {errors.password && (
+                <p className="text-sm font-medium text-destructive">{errors.password}</p>
+              )}
             </div>
             <Button type="submit" size="lg" className="w-full shadow-[var(--shadow-glow)]" disabled={loading}>
               {loading ? "Entrando..." : "Entrar"}

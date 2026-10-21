@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Dumbbell, Users, CalendarPlus, Settings, LayoutDashboard, LogOut, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearPersonalSession, firstAllowedPath, getPersonalSession } from "@/lib/auth";
+import type { PersonalSession } from "@/lib/api";
 
 const nav = [
   { to: "/", label: "Início", icon: LayoutDashboard },
@@ -14,7 +15,7 @@ const nav = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
-  const [session, setSession] = useState(() => getPersonalSession());
+  const [session, setSession] = useState<PersonalSession | null>(null);
 
   useEffect(() => {
     const current = getPersonalSession();
